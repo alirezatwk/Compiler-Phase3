@@ -10,12 +10,14 @@ import main.ast.nodes.expression.values.primitive.StringValue;
 import main.ast.types.NoType;
 import main.ast.types.NullType;
 import main.ast.types.Type;
+import main.ast.types.functionPointer.FptrType;
 import main.ast.types.list.ListNameType;
 import main.ast.types.list.ListType;
 import main.ast.types.single.BoolType;
 import main.ast.types.single.ClassType;
 import main.ast.types.single.IntType;
 import main.ast.types.single.StringType;
+import main.compileErrorException.typeErrors.CallOnNoneFptrType;
 import main.compileErrorException.typeErrors.ClassNotDeclared;
 import main.symbolTable.SymbolTable;
 import main.symbolTable.exceptions.ItemNotFoundException;
@@ -87,6 +89,12 @@ public class ExpressionTypeChecker extends Visitor<Type> {
     @Override
     public Type visit(MethodCall methodCall) {
         //TODO
+
+        // Error 8
+        if(!(methodExpressionType instanceof FptrType)) {
+            methodCallStmt.addError(new CallOnNoneFptrType(methodCallStmt.getLine()));
+            return null;
+        }
         return null;
     }
 
