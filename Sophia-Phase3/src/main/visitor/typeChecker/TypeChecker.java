@@ -12,9 +12,13 @@ import main.ast.nodes.statement.loop.BreakStmt;
 import main.ast.nodes.statement.loop.ContinueStmt;
 import main.ast.nodes.statement.loop.ForStmt;
 import main.ast.nodes.statement.loop.ForeachStmt;
+import main.ast.types.NoType;
 import main.ast.types.Type;
 import main.ast.types.functionPointer.FptrType;
+import main.ast.types.list.ListNameType;
+import main.ast.types.list.ListType;
 import main.ast.types.single.BoolType;
+import main.ast.types.single.ClassType;
 import main.ast.types.single.IntType;
 import main.ast.types.single.StringType;
 import main.compileErrorException.typeErrors.*;
@@ -27,7 +31,9 @@ import main.symbolTable.utils.graph.exceptions.GraphDoesNotContainNodeException;
 import main.visitor.Visitor;
 
 import javax.swing.plaf.nimbus.State;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 public class TypeChecker extends Visitor<Void> {
     private final Graph<String> classHierarchy;
@@ -114,11 +120,11 @@ public class TypeChecker extends Visitor<Void> {
                 constructorDeclaration.addError(new MainConstructorCantHaveArgs(constructorDeclaration.getLine()));
             }
         }
-        for(VarDeclaration varDeclaration : constructorDeclaration.getArgs())
+        for (VarDeclaration varDeclaration : constructorDeclaration.getArgs())
             varDeclaration.accept(this);
-        for(VarDeclaration varDeclaration: constructorDeclaration.getLocalVars())
+        for (VarDeclaration varDeclaration : constructorDeclaration.getLocalVars())
             varDeclaration.accept(this);
-        for(Statement statement : constructorDeclaration.getBody())
+        for (Statement statement : constructorDeclaration.getBody())
             statement.accept(this);
         SymbolTable.pop();
         return null;
@@ -132,11 +138,11 @@ public class TypeChecker extends Visitor<Void> {
         } catch (ItemNotFoundException ignored) {
         }
 
-        for(VarDeclaration varDeclaration : methodDeclaration.getArgs())
+        for (VarDeclaration varDeclaration : methodDeclaration.getArgs())
             varDeclaration.accept(this);
-        for(VarDeclaration varDeclaration: methodDeclaration.getLocalVars())
+        for (VarDeclaration varDeclaration : methodDeclaration.getLocalVars())
             varDeclaration.accept(this);
-        for(Statement statement : methodDeclaration.getBody())
+        for (Statement statement : methodDeclaration.getBody())
             statement.accept(this);
         SymbolTable.pop();
         return null;
@@ -165,7 +171,7 @@ public class TypeChecker extends Visitor<Void> {
 
     @Override
     public Void visit(BlockStmt blockStmt) {
-        for(Statement statement : blockStmt.getStatements())
+        for (Statement statement : blockStmt.getStatements())
             statement.accept(this);
         return null;
     }
@@ -173,16 +179,15 @@ public class TypeChecker extends Visitor<Void> {
     @Override
     public Void visit(ConditionalStmt conditionalStmt) {
         // Error 5
-        if(conditionalStmt.getCondition() != null) {
+        if (conditionalStmt.getCondition() != null) {
             Type conditionType = conditionalStmt.getCondition().accept(this.expressionTypeChecker);
-            if(!(conditionType instanceof BoolType))
+            if (!(conditionType instanceof BoolType))
                 conditionalStmt.addError(new ConditionNotBool(conditionalStmt.getLine()));
-        }
-        else
+        } else
             conditionalStmt.addError(new ConditionNotBool(conditionalStmt.getLine()));
 
         conditionalStmt.getThenBody().accept(this);
-        if(conditionalStmt.getElseBody() != null)
+        if (conditionalStmt.getElseBody() != null)
             conditionalStmt.getElseBody().accept(this);
         return null;
     }
@@ -196,7 +201,7 @@ public class TypeChecker extends Visitor<Void> {
     @Override
     public Void visit(PrintStmt print) {
         Type argType = print.getArg().accept(this.expressionTypeChecker);
-        if(!(argType instanceof IntType) && !(argType instanceof BoolType) && !(argType instanceof StringType))
+        if (!(argType instanceof IntType) && !(argType instanceof BoolType) && !(argType instanceof StringType))
             print.addError(new UnsupportedTypeForPrint(print.getLine()));
         return null;
     }
@@ -207,42 +212,101 @@ public class TypeChecker extends Visitor<Void> {
         try {
             MethodSymbolTableItem methodSymbolTableItem = (MethodSymbolTableItem) SymbolTable.top.getItem(MethodSymbolTableItem.START_KEY + currentMethod.getMethodName().getName(), true);
             // TODO : nemidonam chegone
-            if(!returnType.getClass().equals(methodSymbolTableItem.getReturnType()))
+            if (!returnType.getClass().equals(methodSymbolTableItem.getReturnType()))
                 returnStmt.addError(new ReturnValueNotMatchMethodReturnType(returnStmt));
+        } catch (ItemNotFoundException ignored) {
         }
-        catch (ItemNotFoundException ignored) {}
         return null;
     }
 
     @Override
     public Void visit(BreakStmt breakStmt) {
-        if(loopCnt <= 0)
+        if (loopCnt <= 0)
             breakStmt.addError(new ContinueBreakNotInLoop(breakStmt.getLine(), 0));
         return null;
     }
 
     @Override
     public Void visit(ContinueStmt continueStmt) {
-        if(loopCnt <= 0)
+        if (loopCnt <= 0)
             continueStmt.addError(new ContinueBreakNotInLoop(continueStmt.getLine(), 1));
         return null;
     }
 
     @Override
     public Void visit(ForeachStmt foreachStmt) {
+        Type identifierType = foreachStmt.getVariable().accept(this.expressionTypeChecker);
+        Type expressionType = foreachStmt.getList().accept(this.expressionTypeChecker);
+
+        // Error 19
+        if (!(expressionType instanceof ListType) && !(expressionType instanceof NoType))
+            foreachStmt.addError(new ForeachCantIterateNoneList(foreachStmt.getLine()));
+        else {
+            boolean isSame = true;
+            ListType listType = (ListType) expressionType;
+            Type firstType = listType.getElementsTypes().get(0).getType();
+            for (ListNameType listNameType : listType.getElementsTypes())
+                if ()
+        }
+
+
         loopCnt += 1;
-        //TODO
+        foreachStmt.getBody().accept(this);
+        loopCnt -= 1;
         return null;
     }
 
     @Override
     public Void visit(ForStmt forStmt) {
-        if(forStmt.getInitialize() != null)
+        if (forStmt.getInitialize() != null)
             forStmt.getInitialize().accept(this);
-        if()
+        if (forStmt.getCondition() != null) {
+            Type conditionType = forStmt.getCondition().accept(this.expressionTypeChecker);
+            // Error 5
+            if (!(conditionType instanceof BoolType))
+                forStmt.addError(new ConditionNotBool(forStmt.getLine()));
+        }
+        if (forStmt.getUpdate() != null)
+            forStmt.getUpdate().accept(this);
         loopCnt += 1;
-
+        forStmt.getBody().accept(this);
+        loopCnt -= 1;
         return null;
     }
 
+    public boolean isSame(Type a, Type b) {
+        if (a instanceof NoType || b instanceof NoType)
+            return true;
+        if (a instanceof BoolType && b instanceof BoolType)
+            return true;
+        if (a instanceof IntType && b instanceof IntType)
+            return true;
+        if (a instanceof StringType && b instanceof StringType)
+            return true;
+        if (a instanceof ClassType && b instanceof ClassType && ((ClassType) a).getClassName().getName().equals(((ClassType) b).getClassName().getName()))
+            return true;
+        if (a instanceof ListType && b instanceof ListType) {
+            ArrayList<ListNameType> aList = ((ListType) a).getElementsTypes();
+            ArrayList<ListNameType> bList = ((ListType) b).getElementsTypes();
+            if (aList.size() != bList.size())
+                return false;
+            for (int i = 0; i < aList.size(); i += 1)
+                if (!isSame(aList.get(i).getType(), bList.get(i).getType()))
+                    return false;
+            return true;
+        }
+        if (a instanceof FptrType && b instanceof FptrType) {
+            if (!isSame(((FptrType) a).getReturnType(), ((FptrType) b).getReturnType()))
+                return false;
+            ArrayList<Type> aList = ((FptrType) a).getArgumentsTypes();
+            ArrayList<Type> bList = ((FptrType) b).getArgumentsTypes();
+            if (aList.size() != bList.size())
+                return false;
+            for (int i = 0; i < aList.size(); i += 1)
+                if (!isSame(aList.get(i), bList.get(i)))
+                    return false;
+            return true;
+        }
+        return false;
+    }
 }
