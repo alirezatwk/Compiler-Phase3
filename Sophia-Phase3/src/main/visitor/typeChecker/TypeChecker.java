@@ -21,11 +21,13 @@ public class TypeChecker extends Visitor<Void> {
     public TypeChecker(Graph<String> classHierarchy) {
         this.classHierarchy = classHierarchy;
         this.expressionTypeChecker = new ExpressionTypeChecker(classHierarchy);
+        ExpressionTypeChecker.currentClass = null;
     }
 
     @Override
     public Void visit(Program program) {
         //TODO
+        // TODO: update currentClass
         return null;
     }
 
