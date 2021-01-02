@@ -59,7 +59,7 @@ public class TypeChecker extends Visitor<Void> {
                 hasMain = true;
             classDeclaration.accept(this);
         }
-        // Error 25
+
         if (!hasMain)
             program.addError(new NoMainClass());
         return null;
@@ -78,11 +78,11 @@ public class TypeChecker extends Visitor<Void> {
         if (classDeclaration.getClassName().getName().equals("Main")) {
             try {
                 Collection<String> collection = classHierarchy.getParentsOfNode(classDeclaration.getClassName().getName());
-                // Error 26
+
                 if (!collection.isEmpty())
                     classDeclaration.addError(new MainClassCantExtend(classDeclaration.getLine()));
 
-                // Error 28
+
                 if (classDeclaration.getConstructor() == null)
                     classDeclaration.addError(new NoConstructorInMainClass(classDeclaration));
 
@@ -90,12 +90,14 @@ public class TypeChecker extends Visitor<Void> {
             } // Cause it can't.
         } else {
             // Other
-            // Error 27
+
             if (classDeclaration.getParentClassName() != null && classDeclaration.getParentClassName().getName().equals("Main"))
                 classDeclaration.addError(new CannotExtendFromMainClass(classDeclaration.getLine()));
         }
-        if (classDeclaration.getConstructor() != null)
+        if (classDeclaration.getConstructor() != null) {
+            currentMethod = classDeclaration.getConstructor();
             classDeclaration.getConstructor().accept(this);
+        }
         for (MethodDeclaration methodDeclaration : classDeclaration.getMethods()) {
             currentMethod = methodDeclaration;
             methodDeclaration.accept(this);
@@ -115,13 +117,12 @@ public class TypeChecker extends Visitor<Void> {
         } catch (ItemNotFoundException ignored) {
         }
 
-        // Error 29
         if (ExpressionTypeChecker.currentClass.getClassName().getName().equals("Main")) {
             if (!constructorDeclaration.getArgs().isEmpty()) {
                 constructorDeclaration.addError(new MainConstructorCantHaveArgs(constructorDeclaration.getLine()));
             }
         }
-        // Error 17
+
         if(!ExpressionTypeChecker.currentClass.getClassName().getName().equals(constructorDeclaration.getMethodName().getName()))
             constructorDeclaration.addError(new ConstructorNotSameNameAsClass(constructorDeclaration.getLine()));
 
@@ -164,10 +165,25 @@ public class TypeChecker extends Visitor<Void> {
         Type identifierType = varDeclaration.getType();
         if (identifierType instanceof ListType) {
             ListType listType = (ListType) identifierType;
-            // Error 11
+
             if (listType.getElementsTypes().isEmpty())
                 varDeclaration.addError(new CannotHaveEmptyList(varDeclaration.getLine()));
-
+            ArrayList<ListNameType> elements = listType.getElementsTypes();
+            boolean findSame = false;
+            for(int i = 0; i < elements.size(); i++) {
+                if(elements.get(i).getType() instanceof ListType)
+                    elements.get(i).getName().accept(this);
+                if(!elements.get(i).getName().getName().equals("") && !findSame) {
+                    for(int j = i + 1; j < elements.size(); j++) {
+                        if (elements.get(i).getName().getName().equals(elements.get(j).getName().getName())) {
+                            findSame = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if(findSame)
+                varDeclaration.addError(new DuplicateListId(varDeclaration.getLine()));
         }
         return null;
     }
@@ -176,7 +192,7 @@ public class TypeChecker extends Visitor<Void> {
     public Void visit(AssignmentStmt assignmentStmt) {
         Type lType = assignmentStmt.getlValue().accept(this.expressionTypeChecker);
         Type rType = assignmentStmt.getrValue().accept(this.expressionTypeChecker);
-        // TODO: Errors
+        // TODO
         return null;
     }
 
@@ -189,7 +205,7 @@ public class TypeChecker extends Visitor<Void> {
 
     @Override
     public Void visit(ConditionalStmt conditionalStmt) {
-        // Error 5
+
         if (conditionalStmt.getCondition() != null) {
             Type conditionType = conditionalStmt.getCondition().accept(this.expressionTypeChecker);
             if (!(conditionType instanceof BoolType) && !(conditionType instanceof NoType))
@@ -224,9 +240,14 @@ public class TypeChecker extends Visitor<Void> {
         Type returnType = returnStmt.getReturnedExpr().accept(this.expressionTypeChecker);
         try {
             MethodSymbolTableItem methodSymbolTableItem = (MethodSymbolTableItem) SymbolTable.top.getItem(MethodSymbolTableItem.START_KEY + currentMethod.getMethodName().getName(), true);
-            // Error 14
-            if (!isSame(returnType, methodSymbolTableItem.getReturnType()))
-                returnStmt.addError(new ReturnValueNotMatchMethodReturnType(returnStmt));
+            if (methodSymbolTableItem.getReturnType() instanceof NullType || methodSymbolTableItem.getReturnType() instanceof NoType){
+                if(!(returnType instanceof NullType))
+                    returnStmt.addError(new ReturnValueNotMatchMethodReturnType(returnStmt));
+            }
+            else {
+                if (!isSame(returnType, methodSymbolTableItem.getReturnType()))
+                    returnStmt.addError(new ReturnValueNotMatchMethodReturnType(returnStmt));
+            }
         } catch (ItemNotFoundException ignored) {
         }
         return null;
@@ -251,7 +272,6 @@ public class TypeChecker extends Visitor<Void> {
         Type identifierType = foreachStmt.getVariable().accept(this.expressionTypeChecker);
         Type expressionType = foreachStmt.getList().accept(this.expressionTypeChecker);
 
-        // Error 19
         if (!(expressionType instanceof ListType) && !(expressionType instanceof NoType))
             foreachStmt.addError(new ForeachCantIterateNoneList(foreachStmt.getLine()));
         else if (expressionType instanceof ListType) {
@@ -264,10 +284,9 @@ public class TypeChecker extends Visitor<Void> {
                     break;
                 }
 
-            // Error 20
             if (!allSame)
                 foreachStmt.addError(new ForeachListElementsNotSameType(foreachStmt.getLine()));
-            // Error 21
+
             if (!isSame(firstType, identifierType))
                 foreachStmt.addError(new ForeachVarNotMatchList(foreachStmt));
         }
@@ -283,7 +302,7 @@ public class TypeChecker extends Visitor<Void> {
             forStmt.getInitialize().accept(this);
         if (forStmt.getCondition() != null) {
             Type conditionType = forStmt.getCondition().accept(this.expressionTypeChecker);
-            // Error 5
+
             if (!(conditionType instanceof BoolType))
                 forStmt.addError(new ConditionNotBool(forStmt.getLine()));
         }

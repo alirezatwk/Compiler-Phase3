@@ -48,9 +48,7 @@ public class ExpressionTypeChecker extends Visitor<Type> {
         if ((firstOperandType instanceof NoType) && (secondOperandType instanceof NoType)) {
             return new NoType();
         }
-        if (binaryExpression.getBinaryOperator().equals(BinaryOperator.gt) ||
-                binaryExpression.getBinaryOperator().equals(BinaryOperator.lt) ||
-                binaryExpression.getBinaryOperator().equals(BinaryOperator.add) ||
+        if (binaryExpression.getBinaryOperator().equals(BinaryOperator.add) ||
                 binaryExpression.getBinaryOperator().equals(BinaryOperator.sub) ||
                 binaryExpression.getBinaryOperator().equals(BinaryOperator.mult) ||
                 binaryExpression.getBinaryOperator().equals(BinaryOperator.div) ||
@@ -71,6 +69,13 @@ public class ExpressionTypeChecker extends Visitor<Type> {
                 binaryExpression.getBinaryOperator().equals(BinaryOperator.neq)) {
             return new NoType();
             // TODO
+        } else if (binaryExpression.getBinaryOperator().equals(BinaryOperator.gt) ||
+                binaryExpression.getBinaryOperator().equals(BinaryOperator.lt)){
+            if (firstOperandType instanceof IntType && secondOperandType instanceof IntType)
+                return new BoolType();
+            if ((firstOperandType instanceof IntType || firstOperandType instanceof NoType) &&
+                    (secondOperandType instanceof IntType || secondOperandType instanceof NoType))
+                return new NoType();
         }
         binaryExpression.addError(new UnsupportedOperandType(binaryExpression.getLine(), binaryExpression.getBinaryOperator().name()));
         return new NoType();
@@ -162,7 +167,7 @@ public class ExpressionTypeChecker extends Visitor<Type> {
                 same = false;
                 break;
             }
-        if (!same && !(indexType instanceof IntType)) {
+        if (!same && !(listAccessByIndex.getInstance() instanceof IntValue)) {
             listAccessByIndex.addError(new CantUseExprAsIndexOfMultiTypeList(listAccessByIndex.getLine()));
             return new NoType();
         } else if (wasNotInt) {
